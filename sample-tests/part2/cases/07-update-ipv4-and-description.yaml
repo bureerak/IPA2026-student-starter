@@ -1,0 +1,13 @@
+fixture: 07-update-ipv4-and-description.yaml
+
+expected:
+  status: ok
+  result: planned
+  operation: update
+  changes:
+    ipv4:
+      from: 10.99.99.99/32
+      to: 172.23.67.67/32
+    description:
+      from: LEGACY-INTERFACE
+      to: IPA2026-67070067
