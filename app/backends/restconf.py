@@ -98,3 +98,8 @@ def apply_interface(
 
     if response.status_code in [200, 201, 204]:
         return {"status" : "ok", "result" : "applied"}
+
+    if response.status_code == 401 or response.status_code == 403:
+        return {"status" : "error", "result" : "authentication_failed"}
+
+    return {"status" : "error", "result" : "backend_failed"}
