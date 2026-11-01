@@ -5,6 +5,7 @@ from netmiko import (
     NetmikoAuthenticationException,
     NetmikoTimeoutException,
 )
+from netmiko.utilities import get_structured_data_textfsm
 
 CONNECT_TIMEOUT = 10
 
@@ -32,21 +33,37 @@ def _parsed(output):
     return output
 
 
+def _is_cli_error(raw_output):
+    """IOS answers an unknown interface with an invalid-input marker."""
+    lowered = raw_output.lower()
+    return "invalid input" in lowered or "% incomplete" in lowered
+
+
 def _default_netmiko_get(router, interface_name):
     """Real read path, matching netmiko_get(router, interface_name)."""
+    show_ip = f"show ip interface {interface_name}"
+
     with _connect(router) as connection:
-        ip_info = connection.send_command(
-            f"show ip interface {interface_name}",
-            use_textfsm=True,
-        )
+        # Read this one raw first: an absent interface produces an IOS error
+        # banner that TextFSM refuses to parse, and that is "not found" here,
+        # not a backend failure.
+        raw_ip = connection.send_command(show_ip)
+
         descriptions = connection.send_command(
             "show interfaces description",
             use_textfsm=True,
         )
 
-    # An absent interface prints an error line instead of a parsable table.
-    if not isinstance(ip_info, list):
+    if _is_cli_error(raw_ip):
         ip_info = []
+    else:
+        ip_info = _parsed(
+            get_structured_data_textfsm(
+                raw_ip,
+                platform="cisco_ios",
+                command=show_ip,
+            )
+        )
 
     return ip_info, _parsed(descriptions)
 
