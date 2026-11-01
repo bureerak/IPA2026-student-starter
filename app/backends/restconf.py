@@ -1,6 +1,47 @@
+import os
+
 import requests
+import urllib3
 from ipaddress import IPv4Interface
 from app.backends import planning
+
+REQUEST_TIMEOUT = 10
+
+YANG_JSON = "application/yang-data+json"
+
+# The lab routers present self-signed certificates on the private
+# 10.0.29.0/24 management network, so certificate validation is disabled
+# for those hosts only.
+VERIFY_TLS = False
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _credentials():
+    return (os.getenv("ROUTER_USER", ""), os.getenv("ROUTER_PASS", ""))
+
+
+def _default_http_get(url):
+    """Real RESTCONF read transport, matching the http_get(url) contract."""
+    return requests.get(
+        url,
+        auth=_credentials(),
+        headers={"Accept": YANG_JSON},
+        verify=VERIFY_TLS,
+        timeout=REQUEST_TIMEOUT,
+    )
+
+
+def _default_http_put(url, json=None):
+    """Real RESTCONF write transport, matching http_put(url, json=payload)."""
+    return requests.put(
+        url,
+        json=json,
+        auth=_credentials(),
+        headers={"Accept": YANG_JSON, "Content-Type": YANG_JSON},
+        verify=VERIFY_TLS,
+        timeout=REQUEST_TIMEOUT,
+    )
 
 def get_interface_state(
     router,
@@ -9,7 +50,7 @@ def get_interface_state(
 ):
     """Return normalized interface status using RESTCONF."""
     if http_get is None:
-        http_get = requests.get
+        http_get = _default_http_get
 
     url = f"https://{router}/restconf/data/ietf-interfaces:interfaces/interface={interface_name}"
 
@@ -63,7 +104,7 @@ def apply_interface(
 ):
     """Apply complete desired interface state using RESTCONF."""
     if http_put is None:
-        http_put = requests.put
+        http_put = _default_http_put
 
     name = int(desired_interface["name"][len("Loopback"):])
 
