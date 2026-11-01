@@ -1,0 +1,6 @@
+target: core
+request: 22-plan-complete.yaml
+
+expected:
+  status: ok
+  result: accepted
